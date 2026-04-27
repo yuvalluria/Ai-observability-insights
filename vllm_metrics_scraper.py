@@ -9,8 +9,9 @@ from datetime import datetime
 class VLLMMetricsScraper:
     """Scrapes metrics directly from vLLM /metrics endpoint"""
 
-    def __init__(self, vllm_url="http://localhost:8080"):
+    def __init__(self, vllm_url="http://localhost:8080", cluster_client=None):
         self.base_url = vllm_url
+        self.cluster_client = cluster_client
         self.history = {}
         self.timestamps = []
 
@@ -94,22 +95,52 @@ class VLLMMetricsScraper:
         metrics['namespace'] = namespace
         metrics['model_name'] = model_name
 
-        # GPU type from memory
-        gpu_memory_bytes = self.get_metric_value(raw_metrics, 'vllm:gpu_config_total_memory_bytes')
-        if gpu_memory_bytes:
-            gpu_memory_gb = gpu_memory_bytes / (1024**3)
-            if 14 <= gpu_memory_gb < 20:
-                metrics['gpu_type'] = "NVIDIA T4 (16GB)"
-            elif 22 <= gpu_memory_gb < 26:
-                metrics['gpu_type'] = "NVIDIA A10G (24GB)"
-            elif 38 <= gpu_memory_gb < 50:
-                metrics['gpu_type'] = "NVIDIA A100 (40GB)"
-            elif 78 <= gpu_memory_gb < 90:
-                metrics['gpu_type'] = "NVIDIA A100 (80GB)"
-            else:
-                metrics['gpu_type'] = f"GPU ({gpu_memory_gb:.0f}GB)"
+        # GPU type - try cluster client first (most accurate)
+        gpu_type = "Unknown GPU"
+        if self.cluster_client and hasattr(self.cluster_client, 'get_gpu_type_from_nodes'):
+            try:
+                if self.cluster_client.is_logged_in():
+                    gpu_type = self.cluster_client.get_gpu_type_from_nodes()
+                    if gpu_type and gpu_type != "Unknown":
+                        metrics['gpu_type'] = gpu_type
+                    else:
+                        # Fall back to memory-based inference
+                        gpu_memory_bytes = self.get_metric_value(raw_metrics, 'vllm:gpu_config_total_memory_bytes')
+                        if gpu_memory_bytes:
+                            gpu_memory_gb = gpu_memory_bytes / (1024**3)
+                            if 14 <= gpu_memory_gb < 20:
+                                metrics['gpu_type'] = "NVIDIA T4 (16GB)"
+                            elif 22 <= gpu_memory_gb < 26:
+                                metrics['gpu_type'] = "NVIDIA A10G (24GB)"
+                            elif 38 <= gpu_memory_gb < 50:
+                                metrics['gpu_type'] = "NVIDIA A100 (40GB)"
+                            elif 78 <= gpu_memory_gb < 90:
+                                metrics['gpu_type'] = "NVIDIA A100 (80GB)"
+                            else:
+                                metrics['gpu_type'] = f"GPU ({gpu_memory_gb:.0f}GB)"
+                        else:
+                            metrics['gpu_type'] = "Unknown GPU"
+                else:
+                    metrics['gpu_type'] = "Unknown GPU (cluster disconnected)"
+            except Exception as e:
+                metrics['gpu_type'] = "Unknown GPU"
         else:
-            metrics['gpu_type'] = "Unknown GPU"
+            # No cluster client, use memory-based inference
+            gpu_memory_bytes = self.get_metric_value(raw_metrics, 'vllm:gpu_config_total_memory_bytes')
+            if gpu_memory_bytes:
+                gpu_memory_gb = gpu_memory_bytes / (1024**3)
+                if 14 <= gpu_memory_gb < 20:
+                    metrics['gpu_type'] = "NVIDIA T4 (16GB)"
+                elif 22 <= gpu_memory_gb < 26:
+                    metrics['gpu_type'] = "NVIDIA A10G (24GB)"
+                elif 38 <= gpu_memory_gb < 50:
+                    metrics['gpu_type'] = "NVIDIA A100 (40GB)"
+                elif 78 <= gpu_memory_gb < 90:
+                    metrics['gpu_type'] = "NVIDIA A100 (80GB)"
+                else:
+                    metrics['gpu_type'] = f"GPU ({gpu_memory_gb:.0f}GB)"
+            else:
+                metrics['gpu_type'] = "Unknown GPU"
 
         # KV cache usage
         kv_cache = self.get_metric_value(raw_metrics, 'vllm:gpu_cache_usage_perc')

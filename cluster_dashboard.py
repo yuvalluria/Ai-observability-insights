@@ -90,7 +90,10 @@ if 'prometheus_client' not in st.session_state:
         cluster_client=st.session_state.cluster_client
     )
 if 'vllm_scraper' not in st.session_state:
-    st.session_state.vllm_scraper = VLLMMetricsScraper(vllm_url="http://localhost:8080")
+    st.session_state.vllm_scraper = VLLMMetricsScraper(
+        vllm_url="http://localhost:8080",
+        cluster_client=st.session_state.cluster_client
+    )
 if 'discovered_services' not in st.session_state:
     st.session_state.discovered_services = []
 if 'cluster_insight' not in st.session_state:

@@ -1,0 +1,1 @@
+- [vLLM Production Metrics Knowledge](vllm_production_metrics.md) — Critical missing metrics and implementation guide for production observability
