@@ -5,6 +5,11 @@ Single Streamlit app with multiple pages for vLLM monitoring
 """
 
 import streamlit as st
+import sys
+import os
+
+# Add shared directory to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'shared'))
 
 # Page config - must be first Streamlit command
 st.set_page_config(
@@ -14,13 +19,22 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for consistent styling across all pages
+# Theme support
+from theme import get_theme_css, render_theme_toggle
+
+# Initialize dark mode
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = False
+
+# Apply theme CSS
+st.markdown(get_theme_css(st.session_state.dark_mode), unsafe_allow_html=True)
+
+# Additional custom CSS
 st.markdown("""
 <style>
     .main-header {
         font-size: 2.5rem;
         font-weight: bold;
-        color: #1f77b4;
         margin-bottom: 1rem;
     }
 

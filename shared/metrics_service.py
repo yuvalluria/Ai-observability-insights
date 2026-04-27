@@ -165,10 +165,21 @@ class MetricsService:
 
         # 1. GPU Utilization (DCGM metric - generic GPU compute %)
         gpu_util = self._get_metric_value(raw_metrics, 'DCGM_FI_DEV_GPU_UTIL')
-        metrics['gpu_utilization'] = int(gpu_util) if gpu_util is not None else 0
+
+        # Fallback: if DCGM not available, estimate from KV cache usage
+        if gpu_util is None:
+            gpu_cache = self._get_metric_value(raw_metrics, 'gpu_cache_usage_perc')
+            if gpu_cache is not None:
+                # KV cache % as proxy for GPU memory usage (rough approximation)
+                metrics['gpu_utilization'] = int(gpu_cache * 100)
+            else:
+                metrics['gpu_utilization'] = 0
+        else:
+            metrics['gpu_utilization'] = int(gpu_util)
+
         metrics['gpu_compute_utilization'] = metrics['gpu_utilization']
 
-        # 2. GPU Memory (DCGM metrics)
+        # 2. GPU Memory (DCGM metrics or fallback to vLLM native)
         gpu_mem_free = self._get_metric_value(raw_metrics, 'DCGM_FI_DEV_FB_FREE')
         gpu_mem_used = self._get_metric_value(raw_metrics, 'DCGM_FI_DEV_FB_USED')
 
@@ -176,7 +187,12 @@ class MetricsService:
             total_mem = gpu_mem_free + gpu_mem_used
             metrics['kv_cache_usage_perc'] = int((gpu_mem_used / total_mem) * 100) if total_mem > 0 else 0
         else:
-            metrics['kv_cache_usage_perc'] = 0
+            # Fallback: use native vLLM gpu_cache_usage_perc
+            gpu_cache = self._get_metric_value(raw_metrics, 'gpu_cache_usage_perc')
+            if gpu_cache is not None:
+                metrics['kv_cache_usage_perc'] = int(gpu_cache * 100)
+            else:
+                metrics['kv_cache_usage_perc'] = 0
 
         # 6. Requests Running/Waiting (kserve_vllm or vllm prefix)
         running = self._get_metric_value(raw_metrics, 'num_requests_running')

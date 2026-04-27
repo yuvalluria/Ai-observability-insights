@@ -8,13 +8,16 @@ import sys
 import os
 import time
 import requests
-from datetime import datetime
+import pandas as pd
+import io
+from datetime import datetime, timedelta
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.metrics_service import MetricsService
 from shared.components import *
+from shared.theme import get_theme_css, render_theme_toggle
 from cluster_client import OpenShiftClusterClient
 from bottleneck_classifier import classify_bottleneck_type, get_severity_from_category, get_diagnostic_summary, get_recommendation
 from metrics_db import MetricsDatabase
@@ -26,6 +29,12 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Apply theme
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = False
+
+st.markdown(get_theme_css(st.session_state.dark_mode), unsafe_allow_html=True)
 
 # Initialize session state
 if 'cluster_client' not in st.session_state:
@@ -98,15 +107,25 @@ render_connection_status(vllm_available, ollama_available)
 
 st.markdown("---")
 
-# Get current metrics
+# Get current metrics with error handling
 if vllm_available:
-    current_metrics = st.session_state.metrics_service.get_metrics()
+    try:
+        with st.spinner("Loading metrics..."):
+            current_metrics = st.session_state.metrics_service.get_metrics()
 
-    # Save to database
-    st.session_state.metrics_db.save_metrics(
-        cluster_name="rhoai-vllm",
-        metrics=current_metrics
-    )
+        # Save to database
+        try:
+            st.session_state.metrics_db.save_metrics(
+                cluster_name="rhoai-vllm",
+                metrics=current_metrics
+            )
+        except Exception as db_error:
+            st.sidebar.warning(f"Database save failed: {str(db_error)}")
+
+    except Exception as e:
+        st.error(f"⚠️ Failed to fetch metrics: {str(e)}")
+        st.info("Check if vLLM pod is healthy: `oc get pods -n <namespace>`")
+        st.stop()
 
     # Display GPU and model info
     st.markdown(f"""
@@ -365,12 +384,101 @@ ollama pull granite3-dense:8b
                         except Exception as e:
                             st.error(f"Error: {e}")
 
+    st.markdown("---")
+
+    # SLO Tracking Section
+    st.markdown("### 📋 SLO Tracking")
+
+    # Define SLOs (Service Level Objectives)
+    slos = {
+        'latency_p90': {'target': 10.0, 'current': e2e_latency, 'unit': 's', 'name': 'E2E Latency (P90)'},
+        'ttft_p90': {'target': 2.0, 'current': ttft, 'unit': 's', 'name': 'TTFT (P90)'},
+        'success_rate': {'target': 99.0, 'current': success_rate, 'unit': '%', 'name': 'Success Rate'},
+        'gpu_utilization': {'target': 85.0, 'current': gpu_util, 'unit': '%', 'name': 'GPU Utilization (max)'}
+    }
+
+    slo_cols = st.columns(4)
+
+    for idx, (key, slo) in enumerate(slos.items()):
+        with slo_cols[idx]:
+            # Check if meeting SLO
+            if key == 'success_rate':
+                meeting_slo = slo['current'] >= slo['target']
+            elif key == 'gpu_utilization':
+                meeting_slo = slo['current'] <= slo['target']
+            else:
+                meeting_slo = slo['current'] <= slo['target']
+
+            status_emoji = "✅" if meeting_slo else "❌"
+            status_color = "green" if meeting_slo else "red"
+
+            st.markdown(f"""
+            <div style="
+                background: {'#ecfdf5' if meeting_slo else '#fef2f2'};
+                padding: 1rem;
+                border-radius: 0.5rem;
+                border-left: 3px solid {'#10b981' if meeting_slo else '#ef4444'};
+            ">
+                <div style="font-size: 0.8rem; color: #6b7280;">{slo['name']}</div>
+                <div style="font-size: 1.5rem; font-weight: bold; color: {'#065f46' if meeting_slo else '#991b1b'};">
+                    {slo['current']:.1f}{slo['unit']}
+                </div>
+                <div style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
+                    Target: {slo['target']}{slo['unit']} {status_emoji}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # CSV Export Section
+    st.markdown("### 💾 Export Data")
+
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        st.caption("Export historical metrics for analysis or reporting")
+
+    with col2:
+        if st.button("📥 Export to CSV", use_container_width=True):
+            try:
+                # Get historical data from database
+                history_df = st.session_state.metrics_db.get_metrics_history(
+                    cluster_name="rhoai-vllm",
+                    hours=24
+                )
+
+                if history_df is not None and not history_df.empty:
+                    # Convert to CSV
+                    csv_buffer = io.StringIO()
+                    history_df.to_csv(csv_buffer, index=False)
+                    csv_data = csv_buffer.getvalue()
+
+                    # Offer download
+                    st.download_button(
+                        label="📥 Download CSV",
+                        data=csv_data,
+                        file_name=f"vllm_metrics_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                else:
+                    st.warning("No historical data available yet. Check back after a few minutes.")
+            except Exception as e:
+                st.error(f"Export failed: {str(e)}")
+
 else:
     render_empty_state(
         "vLLM not connected. Run port-forward to start monitoring.",
         "🔌"
     )
     st.code("oc port-forward -n <namespace> pod/<vllm-pod-name> 8080:8080")
+
+# Sidebar
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("### 📖 Help")
+    st.markdown("[Documentation](https://github.com/yuvalluria/Ai-observability-insights)")
 
 # Auto-refresh every 30 seconds
 time.sleep(30)

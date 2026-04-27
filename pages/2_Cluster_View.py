@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from shared.metrics_service import MetricsService
 from shared.components import *
+from shared.theme import get_theme_css, render_theme_toggle
 from cluster_client import OpenShiftClusterClient
 
 # Page config
@@ -25,6 +26,12 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Apply theme
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = False
+
+st.markdown(get_theme_css(st.session_state.dark_mode), unsafe_allow_html=True)
 
 # Initialize session state
 if 'cluster_client' not in st.session_state:
@@ -77,8 +84,14 @@ st.markdown("---")
 st.markdown("### 📡 vLLM Services")
 
 if vllm_available:
-    # Get metrics from connected service
-    vllm_metrics = st.session_state.metrics_service.get_metrics()
+    # Get metrics from connected service with error handling
+    try:
+        with st.spinner("Loading cluster metrics..."):
+            vllm_metrics = st.session_state.metrics_service.get_metrics()
+    except Exception as e:
+        st.error(f"⚠️ Failed to fetch cluster metrics: {str(e)}")
+        st.info("Check vLLM pod health: `oc get pods -n <namespace>`")
+        st.stop()
 
     # Display connected service
     service_data = [{
@@ -261,9 +274,13 @@ with st.sidebar:
 
     if st.session_state.cluster_client.is_logged_in():
         if st.button("🔄 Discover All Services", use_container_width=True):
-            with st.spinner("Scanning cluster..."):
-                st.session_state.discovered_services = st.session_state.cluster_client.discover_vllm_services()
-                st.rerun()
+            try:
+                with st.spinner("Scanning cluster..."):
+                    st.session_state.discovered_services = st.session_state.cluster_client.discover_vllm_services()
+                    st.success(f"Found {len(st.session_state.discovered_services)} services")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Discovery failed: {str(e)}")
 
         if st.session_state.discovered_services:
             st.success(f"Found {len(st.session_state.discovered_services)} services")
@@ -271,6 +288,10 @@ with st.sidebar:
                 st.caption(f"- {svc['name']} ({svc['namespace']})")
     else:
         st.info("Login to OpenShift to discover all cluster services")
+
+    st.markdown("---")
+    st.markdown("### 📖 Help")
+    st.markdown("[Documentation](https://github.com/yuvalluria/Ai-observability-insights)")
 
 # Auto-refresh every 30 seconds
 time.sleep(30)

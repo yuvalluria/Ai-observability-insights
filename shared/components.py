@@ -114,22 +114,21 @@ def render_metric_card(label: str, value: str, delta: Optional[str] = None, help
 
     border_color = color_map.get(color, color_map["blue"])
 
-    delta_html = f'<div style="color: #6b7280; font-size: 0.85rem; margin-top: 0.25rem;">{delta}</div>' if delta else ""
+    # Build HTML string piece by piece to avoid nested f-string issues
+    html_parts = []
+    html_parts.append(f'<div style="background: white; padding: 1rem; border-radius: 0.5rem; border-left: 3px solid {border_color}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">')
+    html_parts.append(f'<div style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0.25rem;">{label}</div>')
+    html_parts.append(f'<div style="font-size: 1.8rem; font-weight: bold; color: #111827;">{value}</div>')
 
-    st.markdown(f"""
-    <div style="
-        background: white;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 3px solid {border_color};
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    ">
-        <div style="color: #6b7280; font-size: 0.85rem; margin-bottom: 0.25rem;">{label}</div>
-        <div style="font-size: 1.8rem; font-weight: bold; color: #111827;">{value}</div>
-        {delta_html}
-        {f'<div style="color: #9ca3af; font-size: 0.75rem; margin-top: 0.5rem;">ℹ️ {help_text}</div>' if help_text else ""}
-    </div>
-    """, unsafe_allow_html=True)
+    if delta:
+        html_parts.append(f'<div style="color: #6b7280; font-size: 0.85rem; margin-top: 0.25rem;">{delta}</div>')
+
+    if help_text:
+        html_parts.append(f'<div style="color: #9ca3af; font-size: 0.75rem; margin-top: 0.5rem;">ℹ️ {help_text}</div>')
+
+    html_parts.append('</div>')
+
+    st.markdown(''.join(html_parts), unsafe_allow_html=True)
 
 
 def render_metric_chart(
@@ -270,3 +269,54 @@ def render_progress_bar(value: float, max_value: float, label: str = "", color: 
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+
+def render_skeleton_loader(height: str = "100px", count: int = 1):
+    """
+    Render skeleton loader for loading states
+
+    Args:
+        height: Height of skeleton element
+        count: Number of skeleton elements to show
+    """
+    for i in range(count):
+        st.markdown(f"""
+        <div style="
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s ease-in-out infinite;
+            border-radius: 0.5rem;
+            height: {height};
+            margin-bottom: 1rem;
+        "></div>
+
+        <style>
+        @keyframes loading {{
+            0% {{ background-position: 200% 0; }}
+            100% {{ background-position: -200% 0; }}
+        }}
+        </style>
+        """, unsafe_allow_html=True)
+
+
+def render_success_toast(message: str):
+    """
+    Render success toast message
+    """
+    st.success(f"✅ {message}")
+
+
+def render_error_toast(message: str, help_text: str = ""):
+    """
+    Render error toast message with optional help
+    """
+    st.error(f"❌ {message}")
+    if help_text:
+        st.info(f"💡 {help_text}")
+
+
+def render_warning_toast(message: str):
+    """
+    Render warning toast message
+    """
+    st.warning(f"⚠️ {message}")
