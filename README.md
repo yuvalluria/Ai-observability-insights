@@ -2,11 +2,11 @@
 
 **Hybrid AI-powered observability for vLLM model serving on Red Hat OpenShift**
 
-Real-time monitoring and intelligent insights for GPU-accelerated LLM inference with vLLM, combining deterministic rules (0% hallucination) with AI predictions (trend forecasting).
+Real-time monitoring and intelligent insights for GPU-accelerated LLM inference with vLLM, combining deterministic rules with AI predictions .
 
 ---
 
-## 🎯 Features
+##  Features
 
 - **Real-time Metrics** - Live GPU utilization, latency, throughput from Prometheus
 - **Hybrid AI Analysis** - Python rules for accuracy + AI for predictions
@@ -17,7 +17,7 @@ Real-time monitoring and intelligent insights for GPU-accelerated LLM inference 
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 ┌─────────────────┐
@@ -27,7 +27,7 @@ Real-time monitoring and intelligent insights for GPU-accelerated LLM inference 
          │ Prometheus
          ↓
 ┌─────────────────────────────┐
-│  Python Classification      │ ← Fast, deterministic (0% hallucination)
+│  Python Classification      │ ← Fast, deterministic 
 │  • GPU underutilization     │
 │  • Decode-bound workload    │
 │  • Queue backlogs          │
@@ -56,7 +56,7 @@ Real-time monitoring and intelligent insights for GPU-accelerated LLM inference 
 
 ---
 
-## 📋 Requirements
+##  Requirements
 
 - Python 3.9+
 - OpenShift CLI (`oc`)
@@ -66,7 +66,7 @@ Real-time monitoring and intelligent insights for GPU-accelerated LLM inference 
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### 1. Install Dependencies
 
@@ -161,7 +161,7 @@ streamlit run cluster_dashboard.py --server.port 8502
 
 ---
 
-## 🧠 Hybrid AI System
+##  Hybrid AI System
 
 ### Python Rules (Deterministic, <100ms)
 
@@ -196,7 +196,7 @@ Action: No action needed - system is right-sized for current load
 **Always adds forward-looking insights:**
 
 ```
-🔮 Prediction (next 10-30 min):
+ Prediction (next 10-30 min):
 - Requests: likely to increase (low current load)
 - GPU: may rise if traffic increases
 - Latency: stable unless saturation occurs
@@ -205,7 +205,7 @@ Action: No action needed - system is right-sized for current load
 
 ---
 
-## 🔧 Configuration
+##  Configuration
 
 ### Environment Variables
 
@@ -241,11 +241,11 @@ Edit `prometheus_client.py` to customize:
 | **Hallucination Rate** | 0% (clear cases) |
 | **Response Time** | <2.5s total |
 | **Prediction Accuracy** | ~75% (AI forecasts) |
-| **vLLM Expert Validated** | ✅ Yes |
+| **vLLM Expert Validated** |  Yes |
 
 ---
 
-## 🎓 How It Works
+##  How It Works
 
 ### 1. Metrics Collection
 ```python
@@ -282,7 +282,7 @@ final_output = output + prediction
 
 ---
 
-## 🔍 Troubleshooting
+##  Troubleshooting
 
 ### No metrics showing
 
@@ -331,7 +331,7 @@ streamlit run app.py --server.port 8501 --logger.level=debug
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions welcome! Areas for improvement:
 - Additional bottleneck detection patterns
@@ -341,13 +341,13 @@ Contributions welcome! Areas for improvement:
 
 ---
 
-## 📄 License
+##  License
 
 MIT License - see LICENSE file
 
 ---
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - **vLLM Project** - https://github.com/vllm-project/vllm
 - **Red Hat OpenShift AI** - RHOAI observability manifests
@@ -356,7 +356,7 @@ MIT License - see LICENSE file
 
 ---
 
-## 📧 Support
+##  Support
 
 For issues and questions:
 - GitHub Issues: https://github.com/yuvalluria/ai-insighter/issues
@@ -364,4 +364,4 @@ For issues and questions:
 
 ---
 
-**Built with ❤️ for the vLLM and OpenShift AI community**
+
