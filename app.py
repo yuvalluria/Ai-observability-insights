@@ -8,6 +8,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from prometheus_client import PrometheusClient
+from vllm_metrics_scraper import VLLMMetricsScraper
 from metrics_db import MetricsDatabase
 
 # Page config
@@ -454,6 +455,8 @@ if 'prometheus_client' not in st.session_state:
     st.session_state.prometheus_client = PrometheusClient(
         cluster_client=st.session_state.cluster_client
     )
+if 'vllm_scraper' not in st.session_state:
+    st.session_state.vllm_scraper = VLLMMetricsScraper(vllm_url="http://localhost:8080")
 if 'metrics_db' not in st.session_state:
     st.session_state.metrics_db = MetricsDatabase()
 if 'use_real_metrics' not in st.session_state:
@@ -597,7 +600,15 @@ with st.sidebar:
 # Main header
 st.markdown('<div class="main-header">Model Serving Dashboard</div>', unsafe_allow_html=True)
 if st.session_state.use_real_metrics:
-    st.markdown(f"**Real-time metrics from cluster:** `{st.session_state.selected_cluster}`")
+    # Get current metrics to extract GPU info
+    temp_metrics = st.session_state.vllm_scraper.get_metrics()
+    gpu_type = temp_metrics.get('gpu_type', 'Unknown GPU')
+    model_name = temp_metrics.get('model_name', 'unknown')
+
+    st.markdown(f"""
+    **Real-time metrics from cluster:** `{st.session_state.selected_cluster}`
+    **GPU:** `{gpu_type}` | **Model:** `{model_name}`
+    """)
 else:
     st.markdown("**Demo Mode** - Using simulated metrics")
 
@@ -717,16 +728,17 @@ st.markdown("---")
 # Generate new metrics FIRST (needed by chat)
 # If model/namespace selected, get metrics for that specific service
 if st.session_state.use_real_metrics:
+    # Use direct vLLM scraper (works with port-forward to vLLM pod)
     if st.session_state.selected_namespace != "All" and st.session_state.selected_model != "All":
         # Get specific model's metrics
-        current_metrics = st.session_state.prometheus_client.get_metrics(
+        current_metrics = st.session_state.vllm_scraper.get_metrics(
             namespace=st.session_state.selected_namespace,
             service=st.session_state.selected_model
         )
     else:
         # Get default service metrics or aggregated
-        current_metrics = st.session_state.prometheus_client.get_metrics()
-    simulator_for_charts = st.session_state.prometheus_client
+        current_metrics = st.session_state.vllm_scraper.get_metrics()
+    simulator_for_charts = st.session_state.vllm_scraper
 else:
     current_metrics = st.session_state.simulator.generate_metrics()
     simulator_for_charts = st.session_state.simulator
@@ -885,8 +897,8 @@ st.markdown("---")
 
 # Check thresholds and auto-analyze if needed (happens before AI insights banner)
 if st.session_state.use_real_metrics:
-    current_metrics = st.session_state.prometheus_client.get_metrics()
-    simulator_for_charts = st.session_state.prometheus_client
+    current_metrics = st.session_state.vllm_scraper.get_metrics()
+    simulator_for_charts = st.session_state.vllm_scraper
 else:
     current_metrics = st.session_state.simulator.generate_metrics()
     simulator_for_charts = st.session_state.simulator
