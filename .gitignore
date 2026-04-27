@@ -72,3 +72,11 @@ live_insight_capture.json
 *.pem
 *.key
 kubeconfig
+
+# Agent analysis and documentation
+.claude/
+QUICK_WINS.md
+VLLM_EXPERT_ANALYSIS.md
+IMPLEMENTATION_CHECKLIST.md
+VLLM_METRICS_GUIDE.md
+PRODUCT_RECOMMENDATIONS.md
