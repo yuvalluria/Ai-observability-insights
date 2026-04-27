@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
 from prometheus_client import PrometheusClient
+from vllm_metrics_scraper import VLLMMetricsScraper
 from cluster_client import OpenShiftClusterClient
 import json
 
@@ -88,6 +89,8 @@ if 'prometheus_client' not in st.session_state:
     st.session_state.prometheus_client = PrometheusClient(
         cluster_client=st.session_state.cluster_client
     )
+if 'vllm_scraper' not in st.session_state:
+    st.session_state.vllm_scraper = VLLMMetricsScraper(vllm_url="http://localhost:8080")
 if 'discovered_services' not in st.session_state:
     st.session_state.discovered_services = []
 if 'cluster_insight' not in st.session_state:
@@ -185,8 +188,24 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Get cluster metrics from Prometheus
-cluster_metrics = st.session_state.prometheus_client.get_cluster_metrics()
+# Get cluster metrics from direct vLLM connection (simplified for single service)
+if st.session_state.vllm_scraper.is_available():
+    # Get metrics from direct vLLM connection
+    vllm_metrics = st.session_state.vllm_scraper.get_metrics()
+
+    # Adapt single-service metrics to cluster format
+    cluster_metrics = {
+        'total_models': 1,  # Single model connected
+        'avg_gpu_utilization': vllm_metrics.get('kv_cache_usage_perc', 0),
+        'cluster_throughput': vllm_metrics.get('tokens_per_second', 0),
+        'cluster_success_rate': vllm_metrics.get('request_success_rate', 100.0),
+        'total_requests_running': vllm_metrics.get('num_requests_running', 0),
+        'total_requests_waiting': vllm_metrics.get('num_requests_waiting', 0),
+        'avg_latency_p90': vllm_metrics.get('e2e_request_latency_p90', 0.0)
+    }
+else:
+    # Fall back to Prometheus if available
+    cluster_metrics = st.session_state.prometheus_client.get_cluster_metrics()
 
 st.markdown("---")
 
@@ -348,7 +367,45 @@ st.markdown("---")
 # Model deployments table
 st.markdown("### Model Deployments")
 
-if st.session_state.discovered_services:
+# Auto-detect connected vLLM service via port-forward
+if st.session_state.vllm_scraper.is_available():
+    # Get current service info from direct connection
+    vllm_metrics = st.session_state.vllm_scraper.get_metrics()
+
+    # Show the currently connected service
+    connected_services = [{
+        'name': 'vllm-llama-model-predictor',  # Known from earlier discovery
+        'namespace': vllm_metrics.get('namespace', 'lightspeed-poc'),
+        'model': vllm_metrics.get('model_name', 'unknown'),
+        'gpu': vllm_metrics.get('gpu_type', 'Unknown GPU'),
+        'requests_running': vllm_metrics.get('num_requests_running', 0),
+        'requests_waiting': vllm_metrics.get('num_requests_waiting', 0),
+        'kv_cache_usage': f"{vllm_metrics.get('kv_cache_usage_perc', 0)}%",
+        'status': '✅ Connected'
+    }]
+
+    services_df = pd.DataFrame(connected_services)
+
+    # Display table with live metrics
+    st.dataframe(
+        services_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            'name': st.column_config.TextColumn('Service Name', width='medium'),
+            'namespace': st.column_config.TextColumn('Namespace', width='small'),
+            'model': st.column_config.TextColumn('Model', width='medium'),
+            'gpu': st.column_config.TextColumn('GPU Type', width='medium'),
+            'requests_running': st.column_config.NumberColumn('Running', width='small'),
+            'requests_waiting': st.column_config.NumberColumn('Waiting', width='small'),
+            'kv_cache_usage': st.column_config.TextColumn('KV Cache', width='small'),
+            'status': st.column_config.TextColumn('Status', width='small')
+        }
+    )
+
+    st.success(f"Connected to vLLM service via port-forward (localhost:8080)")
+elif st.session_state.discovered_services:
+    # Fall back to discovered services from cluster scan
     services_df = pd.DataFrame(st.session_state.discovered_services)
 
     # Display table
@@ -361,7 +418,7 @@ if st.session_state.discovered_services:
     # Add drill-down capability
     st.caption("Click 'Single Service View' in sidebar to monitor individual services")
 else:
-    st.info("No vLLM services discovered. Click 'Discover Services' in sidebar to scan cluster.")
+    st.info("No vLLM services detected. Make sure port-forward is running: `oc port-forward -n lightspeed-poc pod/<pod-name> 8080:8080`")
 
 # Auto-refresh
 st.markdown("---")
