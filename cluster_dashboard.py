@@ -99,7 +99,7 @@ if 'last_cluster_analysis' not in st.session_state:
 def query_ollama_cluster(cluster_metrics, services_metrics):
     """Generate cluster-level AI insights"""
     import requests
-    from prompts import get_cluster_dashboard_prompt
+    from prompts_v2 import get_cluster_dashboard_prompt
 
     prompt = get_cluster_dashboard_prompt(cluster_metrics, services_metrics)
 

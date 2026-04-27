@@ -224,10 +224,10 @@ def query_ollama(metrics, user_question, auto=False, models_context=None):
     3. If UNCLEAR → use AI for full analysis
     4. Interactive chat → always use AI
     """
-    from prompts import get_model_serving_chat_prompt
     from prompts_v2 import (
         get_model_serving_auto_analysis_prompt_direct,
-        get_model_serving_auto_analysis_prompt_ai
+        get_model_serving_auto_analysis_prompt_ai,
+        get_model_serving_chat_prompt
     )
 
     if auto:
